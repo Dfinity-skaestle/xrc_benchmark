@@ -86,12 +86,12 @@ actor {
   };
 
   /// Extract the current exchange rate for the given symbol.
-  public func fetch_results(symbol : Text, second_symbol : Text) : async ?[Float] {
+  public query func fetch_results(symbol : Text, second_symbol : Text) : async ?[Float] {
     let key = Text.concat(symbol, second_symbol);
-    results.get(key);
+    return results.get(key);
   };
 
-  public func get_num_failures() : async Nat {
-    get_num_failures;
+  public query func get_num_failures() : async Nat {
+    return num_failures;
   };
 };
