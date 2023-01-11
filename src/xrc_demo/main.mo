@@ -47,7 +47,6 @@ actor {
     // Every XRC call needs 10B cycles.
     Cycles.add(10_000_000_000);
     let response = await xrc_canister_actor.get_exchange_rate(request);
-    let other_response = await call(Principal.fromText(target_canister_id), "get_exchange_rate", request)
     // Print out the response to get a detailed view.
     Dbg.print(debug_show (response));
     // Return 0.0 if there is an error for the sake of simplicity.
