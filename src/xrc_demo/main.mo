@@ -12,6 +12,8 @@ import Dbg "mo:base/Debug";
 import Principal "mo:base/Principal";
 import HashMap "mo:base/HashMap";
 import Array "mo:base/Array";
+import Error "mo:base/Error";
+import Buffer "mo:base/Buffer";
 
 actor {
 
@@ -21,6 +23,7 @@ actor {
   // Should be a Tuple of Text!
   var results : HashMap.HashMap<Text, [Float]> = HashMap.HashMap<Text, [Float]>(1000, Text.equal, Text.hash);
   var num_failures = 0;
+  var failures = Buffer.Buffer<XRC.ExchangeRateError>(10);
 
   /// Set canister ID of the XRC canister dynamically at runtime
   public func set_xrc_canister_id(canister_id : Text) : async () {
@@ -65,9 +68,15 @@ actor {
           case null { results.put(key, [float_rate]) };
         };
       };
-      case _ {
+      case (#Err(e)) {
         // Might want to have a hashmap of failures here ..
         num_failures += 1;
+        switch e {
+          case (?err) {
+            failures.add(err);
+          };
+          case _ {};
+        };
       };
     };
     // Print out the response to get a detailed view.
@@ -93,5 +102,9 @@ actor {
 
   public query func get_num_failures() : async Nat {
     return num_failures;
+  };
+
+  public query func get_failures() : async [XRC.ExchangeRateError] {
+    return Buffer.toArray(failures);
   };
 };
