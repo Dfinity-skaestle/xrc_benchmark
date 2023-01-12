@@ -13,17 +13,18 @@ import Principal "mo:base/Principal";
 import HashMap "mo:base/HashMap";
 import Array "mo:base/Array";
 import Error "mo:base/Error";
-import Buffer "mo:base/Buffer";
+import List "mo:base/List";
+import Iter "mo:base/Iter";
+import Option "mo:base/Option";
 
 actor {
-
   // Counter that is increased for every call to avoid being able to serve a cached result.
   var counter = 0;
   var target_canister_id = "";
-  // Should be a Tuple of Text!
-  var results : HashMap.HashMap<Text, [Float]> = HashMap.HashMap<Text, [Float]>(1000, Text.equal, Text.hash);
-  var num_failures = 0;
-  var failures = Buffer.Buffer<XRC.ExchangeRateError>(10);
+
+  // XXX Should be a Tuple of Text!
+  var results = HashMap.HashMap<Text, List.List<Float>>(1000, Text.equal, Text.hash);
+  var failures = HashMap.HashMap<Text, Nat32>(10, Text.equal, Text.hash);
 
   /// Set canister ID of the XRC canister dynamically at runtime
   public func set_xrc_canister_id(canister_id : Text) : async () {
@@ -40,7 +41,7 @@ actor {
     let time_sec = Time.now() / 1_000_000_000;
     // Use the previous minute to increase the chance of getting a rate because
     // not every exchange has data available for the current minute.
-    let time = Nat64.fromIntWrap(time_sec - counter * 60000);
+    let time = Nat64.fromIntWrap(time_sec - counter * 60);
     let request : XRC.GetExchangeRateRequest = {
       base_asset = {
         symbol = symbol;
@@ -62,18 +63,35 @@ actor {
         let float_rate = Float.fromInt(Nat64.toNat(rate_response.rate));
         // Remember result
         let key = Text.concat(symbol, second_symbol);
-        let previous = results.get(key);
-        switch (previous) {
-          case (?p) { results.put(key, Array.append(p, [float_rate])) };
-          case null { results.put(key, [float_rate]) };
-        };
+        let old_list = results.get(key);
+        let list = Option.get(old_list, List.nil());
+        let new_list = List.push(float_rate, list);
+        results.put(key, new_list);
       };
       case (#Err(e)) {
-        // Might want to have a hashmap of failures here ..
-        num_failures += 1;
         switch e {
           case (?err) {
-            failures.add(err);
+            let key = switch err {
+              case (#CryptoBaseAssetNotFound) { "CryptoBaseAssetNotFound" };
+              case (#CryptoQuoteAssetNotFound) { "CryptoQuoteAssetNotFound" };
+              case (#StablecoinRateNotFound) { "StablecoinRateNotFound" };
+              case (#StablecoinRateTooFewRates) { "StablecoinRateTooFewRates" };
+              case (#StablecoinRateZeroRate) { "StablecoinRateZeroRate" };
+              case (#ForexInvalidTimestamp) { "ForexInvalidTimestamp" };
+              case (#ForexBaseAssetNotFound) { "ForexBaseAssetNotFound" };
+              case (#ForexQuoteAssetNotFound) { "ForexQuoteAssetNotFound" };
+              case (#ForexAssetsNotFound) { "ForexAssetsNotFound" };
+              case (#RateLimited) { "RateLimited" };
+              case (#NotEnoughCycles) { "NotEnoughCycles" };
+              case (#FailedToAcceptCycles) { "FailedToAcceptCycles" };
+              case (#InconsistentRatesReceived) { "InconsistentRatesReceived" };
+              case (#Other(_)) { "Other" };
+            };
+            let previous = failures.get(key);
+            switch (previous) {
+              case (?p) { failures.put(key, p + 1) };
+              case null { failures.put(key, 1) };
+            };
           };
           case _ {};
         };
@@ -97,14 +115,13 @@ actor {
   /// Extract the current exchange rate for the given symbol.
   public query func fetch_results(symbol : Text, second_symbol : Text) : async ?[Float] {
     let key = Text.concat(symbol, second_symbol);
-    return results.get(key);
+    switch (results.get(key)) {
+      case (?r) { return ?List.toArray(r) };
+      case null { return null };
+    };
   };
 
-  public query func get_num_failures() : async Nat {
-    return num_failures;
-  };
-
-  public query func get_failures() : async [XRC.ExchangeRateError] {
-    return Buffer.toArray(failures);
+  public query func get_failures() : async [(Text, Nat32)] {
+    return Iter.toArray(failures.entries());
   };
 };
