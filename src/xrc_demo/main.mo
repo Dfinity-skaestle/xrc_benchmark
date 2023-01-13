@@ -23,7 +23,7 @@ actor {
   var target_canister_id = "";
 
   // XXX Should be a Tuple of Text!
-  var results = HashMap.HashMap<Text, List.List<Float>>(1000, Text.equal, Text.hash);
+  var results : List.List<Float> = List.nil();
   var failures = HashMap.HashMap<Text, Nat32>(10, Text.equal, Text.hash);
 
   /// Set canister ID of the XRC canister dynamically at runtime
@@ -62,11 +62,7 @@ actor {
         // Extract result
         let float_rate = Float.fromInt(Nat64.toNat(rate_response.rate));
         // Remember result
-        let key = Text.concat(symbol, second_symbol);
-        let old_list = results.get(key);
-        let list = Option.get(old_list, List.nil());
-        let new_list = List.push(float_rate, list);
-        results.put(key, new_list);
+        results := List.push(float_rate, results);
       };
       case (#Err(e)) {
         switch e {
@@ -113,12 +109,8 @@ actor {
   };
 
   /// Extract the current exchange rate for the given symbol.
-  public query func fetch_results(symbol : Text, second_symbol : Text) : async ?[Float] {
-    let key = Text.concat(symbol, second_symbol);
-    switch (results.get(key)) {
-      case (?r) { return ?List.toArray(r) };
-      case null { return null };
-    };
+  public query func fetch_results(symbol : Text, second_symbol : Text) : async [Float] {
+    return List.toArray(results);
   };
 
   public query func get_failures() : async [(Text, Nat32)] {
