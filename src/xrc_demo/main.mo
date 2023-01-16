@@ -22,7 +22,6 @@ actor {
   var counter = 0;
   var target_canister_id = "";
 
-  // XXX Should be a Tuple of Text!
   var results : List.List<Float> = List.nil();
   var failures = HashMap.HashMap<Text, Nat32>(10, Text.equal, Text.hash);
 
@@ -108,8 +107,8 @@ actor {
     };
   };
 
-  /// Extract the current exchange rate for the given symbol.
-  public query func fetch_results(symbol : Text, second_symbol : Text) : async [Float] {
+  /// Return previously fetched rates.
+  public query func fetch_results() : async [Float] {
     return List.toArray(results);
   };
 
