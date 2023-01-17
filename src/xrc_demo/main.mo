@@ -115,4 +115,10 @@ actor {
   public query func get_failures() : async [(Text, Nat32)] {
     return Iter.toArray(failures.entries());
   };
+
+  /// Reset internal state of the canister. Clears all recorded failures and rates.
+  public func reset() : async () {
+    results := List.nil();
+    failures := HashMap.HashMap<Text, Nat32>(10, Text.equal, Text.hash);
+  };
 };
